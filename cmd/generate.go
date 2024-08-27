@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/dorser/seccomp-ebpf/pkg/gadget"
 	"github.com/dorser/seccomp-ebpf/pkg/seccomp"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 type cmdOpts struct {
@@ -22,21 +26,21 @@ func generateCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			profile, err := seccomp.LoadProfile(opts.profilePath)
 			if err != nil {
-				return fmt.Errorf("failed to load seccomp profile: %v", err)
+				return fmt.Errorf("load seccomp profile: %v", err)
 			}
 
-			fmt.Println("Loaded seccomp profile successfully!")
-			gadgetCode, err := gadget.GenerateGadgetCode(profile)
+			logrus.Infof("Loaded seccomp profile successfully!")
+			gadgetCode, err := gadget.GenerateGadgetCode(getGadgetNameFromProfilePath(opts.profilePath), profile)
 			if err != nil {
-				return fmt.Errorf("failed to generate gadget code: %v", err)
+				return fmt.Errorf("generate gadget code: %v", err)
 			}
 
 			err = os.WriteFile(opts.outputPath, []byte(gadgetCode), 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write gadget code to file: %v", err)
+				return fmt.Errorf("write gadget code to file: %v", err)
 			}
 
-			fmt.Printf("Gadget code generated and saved to %s\n", opts.outputPath)
+			logrus.Infof("Gadget code generated and saved to %s\n", opts.outputPath)
 
 			return nil
 		},
@@ -44,6 +48,12 @@ func generateCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&opts.profilePath, "profile", "p", "", "Path to the seccomp profile (required)")
 	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", "program.bpf.c", "Path to save the generated gadget code")
-	cmd.MarkFlagRequired("profile")
+	if err := cmd.MarkFlagRequired("profile"); err != nil {
+		logrus.Warnf("mark profile flag required: %s", err.Error())
+	}
 	return cmd
+}
+
+func getGadgetNameFromProfilePath(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }

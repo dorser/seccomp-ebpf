@@ -12,7 +12,7 @@ type TemplateData struct {
 	Syscalls []string
 }
 
-func GenerateGadgetCode(profile *seccomp.SeccompProfile) (string, error) {
+func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (string, error) {
 	tmpl, err := template.New("gadgetTemplate").Parse(gadgetTemplate)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing template: %v", err)
@@ -21,13 +21,11 @@ func GenerateGadgetCode(profile *seccomp.SeccompProfile) (string, error) {
 	var syscalls []string
 
 	for _, syscall := range profile.Syscalls {
-		for _, name := range syscall.Names {
-			syscalls = append(syscalls, name)
-		}
+		syscalls = append(syscalls, syscall.Names...)
 	}
 
 	data := TemplateData{
-		Name:     "Test",
+		Name:     gadgetName,
 		Syscalls: syscalls,
 	}
 

@@ -1,8 +1,10 @@
 package main
 
 import (
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 func main() {
@@ -11,7 +13,9 @@ func main() {
 		Short: "Seccomp to eBPF gadget CLI Tool",
 		Long:  "This tool reads a seccomp profile and generates eBPF gadget code to notify when a syscall is called with specified parameters.",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			if err := cmd.Help(); err != nil {
+				logrus.Warnf("printing help: %s", err.Error())
+			}
 		},
 	}
 
