@@ -4,13 +4,14 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/dorser/seccomp-ebpf/pkg/seccomp"
+	"github.com/dorser/seccomp-ebpf/pkg/syscalls"
 	"strings"
 	"text/template"
 )
 
 type TemplateData struct {
 	Name     string
-	Syscalls []string
+	Syscalls syscalls.SyscallMap
 }
 
 //go:embed gadget.tmpl
@@ -23,15 +24,19 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 		return "", fmt.Errorf("Error parsing template: %v", err)
 	}
 
-	var syscalls []string
+	syscallsMap := syscalls.LoadSystemMap("x86_64")
 
 	for _, syscall := range profile.Syscalls {
-		syscalls = append(syscalls, syscall.Names...)
+		for _, name := range syscall.Names {
+			if syscall.Action == "SCMP_ACT_ALLOW" {
+				delete(syscallsMap, name)
+			}
+		}
 	}
 
 	data := TemplateData{
 		Name:     gadgetName,
-		Syscalls: syscalls,
+		Syscalls: syscallsMap,
 	}
 
 	var output strings.Builder

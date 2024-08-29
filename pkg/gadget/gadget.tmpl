@@ -14,6 +14,7 @@
 #endif
 
 struct event {
+  gadget_syscall syscall_raw;
   gadget_timestamp timestamp;
   gadget_mntns_id mntns_id;
   __u32 pid;
@@ -24,9 +25,9 @@ GADGET_TRACER_MAP(events, 1024 * 256);
 
 GADGET_TRACER({{.Name}}_tracer, events, event);
 
-{{range .Syscalls}}
-SEC("tracepoint/syscalls/sys_enter_{{.}}")
-int tracepoint__sys_enter_{{.}}(struct trace_event_raw_sys_enter *ctx) {
+{{range $key, $value := .Syscalls}}
+SEC("tracepoint/syscalls/sys_enter_{{$key}}")
+int tracepoint__sys_enter_{{$key}}(struct trace_event_raw_sys_enter *ctx) {
   struct event *event;
   __u64 pid_tgid = bpf_get_current_pid_tgid();
 
@@ -35,6 +36,7 @@ int tracepoint__sys_enter_{{.}}(struct trace_event_raw_sys_enter *ctx) {
     return 0;
 
   /* event data */
+  event->syscall_raw = {{$value}};
   event->timestamp = bpf_ktime_get_boot_ns();
   event->mntns_id = gadget_get_mntns_id();
   event->pid = pid_tgid >> 32;
