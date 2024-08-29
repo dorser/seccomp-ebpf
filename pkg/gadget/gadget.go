@@ -1,6 +1,7 @@
 package gadget
 
 import (
+	_ "embed"
 	"fmt"
 	"github.com/dorser/seccomp-ebpf/pkg/seccomp"
 	"strings"
@@ -12,7 +13,11 @@ type TemplateData struct {
 	Syscalls []string
 }
 
+//go:embed gadget.tmpl
+var gadgetTemplate string
+
 func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (string, error) {
+
 	tmpl, err := template.New("gadgetTemplate").Parse(gadgetTemplate)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing template: %v", err)

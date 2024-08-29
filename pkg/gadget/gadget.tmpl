@@ -1,9 +1,3 @@
-package gadget
-
-const gadgetTemplate = `
-// SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
-/* Copyright (c) 2024 CHANGEME-Authors */
-
 #include <vmlinux.h>
 
 #include <bpf/bpf_core_read.h>
@@ -54,4 +48,3 @@ int tracepoint__sys_enter_{{.}}(struct trace_event_raw_sys_enter *ctx) {
 {{end}}
 
 char LICENSE[] SEC("license") = "GPL";		
-`
