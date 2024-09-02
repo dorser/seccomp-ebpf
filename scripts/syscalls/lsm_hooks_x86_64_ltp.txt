@@ -1,0 +1,359 @@
+read: security_file_permission
+write: security_file_permission
+open: security_file_alloc
+close: security_sk_free
+stat: security_inode_permission
+lstat: No LSM hooks found
+poll: No LSM hooks found
+lseek: No LSM hooks found
+mmap: security_mmap_file
+mprotect: security_file_mprotect
+munmap: No LSM hooks found
+brk: security_mmap_addr
+rt_sigaction: No LSM hooks found
+rt_sigprocmask: No LSM hooks found
+rt_sigreturn: No LTP test
+ioctl: security_file_ioctl
+pread: security_file_permission
+pwrite: security_file_permission
+readv: security_file_permission
+writev: security_file_permission
+access: security_inode_permission
+pipe: security_inode_alloc
+select: No LSM hooks found
+sched_yield: No LSM hooks found
+mremap: security_mmap_addr
+msync: No LSM hooks found
+mincore: No LSM hooks found
+madvise: security_file_permission
+dup: security_vm_enough_memory_mm
+dup2: No LSM hooks found
+pause: No LSM hooks found
+nanosleep: No LSM hooks found
+getitimer: No LSM hooks found
+alarm: No LSM hooks found
+setitimer: No LSM hooks found
+getpid: No LSM hooks found
+socket: apparmor_socket_sock_rcv_skb
+connect: security_sock_rcv_skb
+accept: security_inode_alloc
+sendto: security_socket_sendmsg
+recvfrom: security_socket_recvmsg
+sendmsg: security_socket_sendmsg
+recvmsg: security_socket_recvmsg
+shutdown: security_socket_shutdown
+bind: security_socket_bind
+listen: security_socket_listen
+getsockname: security_socket_getsockname
+getpeername: security_socket_getpeername
+socketpair: security_socket_create
+setsockopt: security_socket_setsockopt
+getsockopt: security_socket_getsockopt
+clone: security_prepare_creds
+fork: security_sock_rcv_skb
+vfork: security_prepare_creds
+execve: security_vm_enough_memory_mm
+exit: security_current_getsecid_subj
+wait4: security_inode_free
+uname: No LSM hooks found
+shmdt: No LSM hooks found
+fcntl: security_file_fcntl
+flock: security_file_lock
+fsync: security_sock_rcv_skb
+fdatasync: No LSM hooks found
+ftruncate: security_file_truncate
+getdents: security_file_permission
+getcwd: No LSM hooks found
+chdir: security_inode_permission
+fchdir: security_inode_permission
+rename: security_inode_permission
+rmdir: security_inode_permission
+creat: security_inode_create
+unlink: No LSM hooks found
+symlink: security_inode_permission
+readlink: security_inode_permission
+chmod: security_inode_permission
+fchmod: security_inode_permission
+chown: security_inode_permission
+fchown: security_inode_permission
+lchown: security_inode_permission
+umask: No LSM hooks found
+gettimeofday: No LSM hooks found
+getrlimit: No LSM hooks found
+getrusage: No LSM hooks found
+sysinfo: No LSM hooks found
+times: No LSM hooks found
+ptrace: security_ptrace_traceme
+getuid: No LSM hooks found
+syslog: No LSM hooks found
+getgid: No LSM hooks found
+setuid: security_prepare_creds
+setgid: security_prepare_creds
+geteuid: No LSM hooks found
+getegid: No LSM hooks found
+setpgid: security_task_setpgid
+getppid: No LSM hooks found
+getpgrp: No LSM hooks found
+setsid: No LSM hooks found
+setreuid: security_prepare_creds
+setregid: security_prepare_creds
+getgroups: No LSM hooks found
+setgroups: security_capable
+setresuid: security_capable
+getresuid: No LSM hooks found
+setresgid: security_capable
+getresgid: No LSM hooks found
+getpgid: security_task_getpgid
+setfsuid: security_prepare_creds
+setfsgid: security_prepare_creds
+getsid: No LSM hooks found
+capget: security_capget
+capset: security_prepare_creds
+rt_sigpending: No LTP test
+rt_sigtimedwait: No LSM hooks found
+rt_sigqueueinfo: security_task_getsecid_obj
+rt_sigsuspend: No LSM hooks found
+sigaltstack: No LSM hooks found
+utime: security_inode_permission
+mknod: security_path_mknod
+uselib: No LTP test
+personality: No LSM hooks found
+ustat: security_sb_statfs
+statfs: security_sb_statfs
+fstatfs: security_sb_statfs
+sysfs: No LSM hooks found
+getpriority: No LSM hooks found
+setpriority: security_capable
+sched_setparam: security_task_setscheduler
+sched_getparam: security_task_getscheduler
+sched_setscheduler: No LSM hooks found
+sched_getscheduler: security_task_getscheduler
+sched_get_priority_max: No LSM hooks found
+sched_get_priority_min: No LSM hooks found
+sched_rr_get_interval: security_task_getscheduler
+mlock: No LSM hooks found
+munlock: No LSM hooks found
+mlockall: No LSM hooks found
+munlockall: No LSM hooks found
+vhangup: security_capable
+modify_ldt: No LSM hooks found
+pivot_root: security_capable
+_sysctl: No LTP test
+prctl: security_task_prctl
+arch_prctl: No LSM hooks found
+adjtimex: security_capable
+setrlimit: security_task_setrlimit
+chroot: security_inode_permission
+sync: security_prepare_creds
+acct: security_vm_enough_memory_mm
+settimeofday: security_settime64
+mount: security_inode_permission
+umount2: No LSM hooks found
+swapon: security_capable
+swapoff: security_capable
+reboot: security_capable
+sethostname: security_capable
+setdomainname: security_capable
+iopl: security_capable
+ioperm: security_capable
+create_module: No LTP test
+init_module: security_capable
+delete_module: security_capable
+get_kernel_syms: No LTP test
+query_module: No LTP test
+quotactl: No LSM hooks found
+nfsservctl: No LTP test
+getpmsg: No LTP test
+putpmsg: No LTP test
+afs_syscall: No LTP test
+tuxcall: No LTP test
+gettid: No LSM hooks found
+readahead: No LSM hooks found
+setxattr: security_inode_permission
+lsetxattr: No LTP test
+fsetxattr: security_inode_getsecid
+getxattr: security_get
+lgetxattr: security_inode_permission
+fgetxattr: security_inode_getsecid
+listxattr: security_inode_permission
+llistxattr: security_inode_permission
+flistxattr: security_inode_getsecid
+removexattr: security_inode_permission
+lremovexattr: security_inode_permission
+fremovexattr: security_inode_getsecid
+tkill: security_task_getsecid_obj
+time: No LSM hooks found
+futex: No LSM hooks found
+sched_setaffinity: security_task_setscheduler
+sched_getaffinity: security_task_getscheduler
+set_thread_area: No LSM hooks found
+io_setup: No LSM hooks found
+io_destroy: No LSM hooks found
+io_getevents: No LSM hooks found
+io_submit: No LSM hooks found
+io_cancel: No LSM hooks found
+get_thread_area: No LTP test
+lookup_dcookie: lookup_dcookieNo LTP test
+epoll_create: security_d_instantiate
+epoll_ctl_old: No LTP test
+epoll_wait_old: No LTP test
+remap_file_pages: security_mmap_addr
+getdents64: No LTP test
+set_tid_address: No LSM hooks found
+restart_syscall: No LTP test
+semtimedop: No LTP test
+fadvise64: No LTP test
+timer_create: security_capable
+timer_settime: No LSM hooks found
+timer_gettime: No LSM hooks found
+timer_getoverrun: No LSM hooks found
+timer_delete: No LSM hooks found
+clock_settime: security_settime64
+clock_gettime: No LSM hooks found
+clock_getres: No LSM hooks found
+clock_nanosleep: No LSM hooks found
+exit_group: security_inode_permission
+epoll_wait: No LSM hooks found
+epoll_ctl: No LSM hooks found
+tgkill: security_task_getsecid_obj
+utimes: security_inode_permission
+vserver: No LTP test
+mbind: No LSM hooks found
+set_mempolicy: No LSM hooks found
+get_mempolicy: No LSM hooks found
+mq_open: security_inode_permission
+mq_unlink: security_inode_getsecid
+mq_timedsend: security_inode_getsecid
+mq_timedreceive: security_inode_getsecid
+mq_notify: No LSM hooks found
+mq_getsetattr: No LTP test
+kexec_load: No LTP test
+waitid: No LSM hooks found
+add_key: security_prepare_creds
+request_key: security_key_permission
+keyctl: security_key_permission
+inotify_init: No LSM hooks found
+inotify_add_watch: No LTP test
+inotify_rm_watch: No LTP test
+migrate_pages: No LSM hooks found
+openat: security_file_alloc
+mkdirat: security_inode_permission
+mknodat: security_inode_permission
+fchownat: security_inode_permission
+futimesat: security_inode_permission
+newfstatat: security_inode_getsecid
+unlinkat: security_inode_permission
+renameat: security_inode_permission
+linkat: security_inode_permission
+symlinkat: security_inode_permission
+readlinkat: security_inode_permission
+fchmodat: security_inode_permission
+faccessat: security_inode_permission
+pselect6: No LTP test
+ppoll: No LSM hooks found
+unshare: security_capable
+set_robust_list: No LSM hooks found
+get_robust_list: security_capable
+splice: security_d_instantiate
+tee: No LSM hooks found
+sync_file_range: No LSM hooks found
+vmsplice: No LSM hooks found
+move_pages: No LSM hooks found
+utimensat: security_inode_permission
+epoll_pwait: No LSM hooks found
+signalfd: security_d_instantiate
+timerfd_create: No LSM hooks found
+eventfd: security_d_instantiate
+fallocate: security_file_permission
+timerfd_gettime: No LSM hooks found
+accept4: No LSM hooks found
+signalfd4: No LSM hooks found
+eventfd2: No LSM hooks found
+epoll_create1: No LSM hooks found
+dup3: No LSM hooks found
+pipe2: No LSM hooks found
+preadv: security_file_permission
+pwritev: security_file_permission
+rt_tgsigqueueinfo: security_task_getsecid_obj
+perf_event_open: security_capable
+recvmmsg: No LSM hooks found
+fanotify_init: security_capable
+fanotify_mark: security_capable
+prlimit64: No LTP test
+name_to_handle_at: security_inode_permission
+open_by_handle_at: security_capable
+clock_adjtime: security_capable
+syncfs: No LSM hooks found
+sendmmsg: security_socket_sendmsg
+setns: security_capable
+getcpu: No LSM hooks found
+kcmp: security_ptrace_access_check
+finit_module: security_capable
+sched_setattr: security_capable
+sched_getattr: security_task_getscheduler
+renameat2: security_inode_permission
+seccomp: security_current_getsecid_subj
+getrandom: No LSM hooks found
+memfd_create: security_inode_alloc
+kexec_file_load: No LTP test
+bpf: No LSM hooks found
+execveat: security_vm_enough_memory_mm
+userfaultfd: security_capable
+membarrier: No LSM hooks found
+mlock2: No LSM hooks found
+copy_file_range: security_file_permission
+preadv2: security_file_permission
+pwritev2: security_file_permission
+pkey_mprotect: No LTP test
+pkey_alloc: No LTP test
+pkey_free: No LSM hooks found
+statx: security_inode_getsecid
+io_pgetevents: No LSM hooks found
+rseq: No LTP test
+pidfd_send_signal: security_task_getsecid_obj
+io_uring_setup: No LTP test
+io_uring_enter: No LTP test
+io_uring_register: No LTP test
+open_tree: security_capable
+move_mount: security_capable
+fsopen: security_capable
+fsconfig: security_fs_context_parse_param
+fsmount: security_capable
+fspick: security_capable
+pidfd_open: security_d_instantiate
+clone3: security_prepare_creds
+close_range: security_cred_free
+openat2: security_file_alloc
+pidfd_getfd: security_ptrace_access_check
+faccessat2: security_inode_permission
+process_madvise: No LSM hooks found
+epoll_pwait2: No LTP test
+mount_setattr: security_capable
+quotactl_fd: No LTP test
+landlock_create_ruleset: No LTP test
+landlock_add_rule: No LTP test
+landlock_restrict_self: No LTP test
+memfd_secret: No LTP test
+process_mrelease: No LTP test
+fstat: security_inode_permission
+sendfile: security_file_permission
+kill: security_task_getsecid_obj
+truncate: security_file_truncate
+mkdir: security_inode_permission
+link: security_inode_permission
+shmget: security_shm_alloc
+shmat: security_ipc_getsecid
+shmctl: security_shm_shmctl
+semget: security_sem_alloc
+semop: security_sem_semop
+semctl: security_ipc_getsecid
+msgget: security_msg_queue_alloc
+msgsnd: security_msg_msg_alloc
+msgrcv: security_ipc_getsecid
+msgctl: security_ipc_getsecid
+ioprio_set: security_task_setioprio
+ioprio_get: security_task_getioprio
+timerfd_settime: security_sock_rcv_skb
+inotify_init1: security_d_instantiate
+process_vm_readv: security_ptrace_access_check
+process_vm_writev: security_ptrace_access_check
