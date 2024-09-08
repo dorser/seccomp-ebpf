@@ -25,18 +25,34 @@ GADGET_TRACER_MAP(events, 1024 * 256);
 
 GADGET_TRACER({{.Name}}_tracer, events, event);
 
-{{range $key, $value := .Syscalls}}
-SEC("tracepoint/syscalls/sys_enter_{{$key}}")
-int tracepoint__sys_enter_{{$key}}(struct trace_event_raw_sys_enter *ctx) {
+{{range $syscall := .Syscalls}}
+SEC("tracepoint/syscalls/sys_enter_{{$syscall.Name}}")
+int tracepoint__sys_enter_{{$syscall.Name}}(struct trace_event_raw_sys_enter *ctx) {
   struct event *event;
   __u64 pid_tgid = bpf_get_current_pid_tgid();
+  {{- range $arg := $syscall.Args -}}
+  {{if eq $arg.Op "&"}}
+  if (({{$arg.Value}} {{$arg.Op}} ctx->args[{{$arg.Index}}]) == {{$arg.ValueTwo}}) {
+  {{else}}
+  if (ctx->args[{{$arg.Index}}] {{$arg.Op}} {{$arg.Value}}) {
+  {{end}}
+  {{if eq $syscall.Action "SCMP_ACT_ALLOW"}}
+    return 0;
+  }
+  {{else}}
+    continue;
+  else {
+    return 0;
+  }
+  {{end}}
+  {{end}}
 
   event = gadget_reserve_buf(&events, sizeof(*event));
   if (!event)
     return 0;
-
+    
   /* event data */
-  event->syscall_raw = {{$value}};
+  event->syscall_raw = {{$syscall.Nr}};
   event->timestamp = bpf_ktime_get_boot_ns();
   event->mntns_id = gadget_get_mntns_id();
   event->pid = pid_tgid >> 32;
