@@ -12,9 +12,11 @@ type SeccompProfile struct {
 }
 
 type Syscall struct {
-	Names  []string `json:"names"`
-	Action string   `json:"action"`
-	Args   []Arg    `json:"args,omitempty"`
+	Names    []string `json:"names"`
+	Action   string   `json:"action"`
+	Args     []Arg    `json:"args,omitempty"`
+	Includes Includes `json:"includes,omitempty"`
+	Excludes Includes `json:"excludes,omitempty"`
 }
 
 type Arg struct {
@@ -22,6 +24,12 @@ type Arg struct {
 	Value    int    `json:"value"`
 	ValueTwo int    `json:"valueTwo"`
 	Op       string `json:"op"`
+}
+
+type Includes struct {
+	MinKernel string   `json:"minKernel"`
+	Arches    []string `json:"arches"`
+	Caps      []string `json:"caps"`
 }
 
 const (

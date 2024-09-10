@@ -34,9 +34,15 @@ int tracepoint__sys_enter_{{$syscall.Name}}(struct trace_event_raw_sys_enter *ct
   if (ctx->args[{{$arg.Args.Index}}] {{$arg.Args.Op}} {{$arg.Args.Value}}) 
   {{end}}
   {
-    {{if eq $arg.Action "SCMP_ACT_ALLOW"}}
-    return 0;
+        {{if ne $arg.Action "SCMP_ACT_ALLOW"}}
+    {{if eq $arg.Action "SCMP_ACT_ERRNO"}}
+	  u64 pid_tgid = bpf_get_current_pid_tgid();
+	  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
+
+    {{else}}
+    {{$arg.Action}}
     {{end}}
+	{{end}}
   }
   {{end}}
   {{end}}

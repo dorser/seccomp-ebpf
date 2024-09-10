@@ -29,6 +29,15 @@ type TemplateData struct {
 //go:embed gadget.tmpl
 var gadgetTemplate string
 
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (string, error) {
 
 	tmpl, err := template.New("gadgetTemplate").Parse(gadgetTemplate)
@@ -41,33 +50,36 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 	templateData := TemplateData{Name: gadgetName, Syscalls: make(map[string]templateSyscall)}
 	for _, syscall := range profile.Syscalls {
 		for _, name := range syscall.Names {
-			templateDataEntry := templateSyscall{
-				Name: name,
-				Nr:   syscallsMap[name],
-			}
-
-			if len(syscall.Args) > 0 {
-				// Preserve already existing syscalls
-				templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
-
-				for _, arg := range syscall.Args {
-					templateDataEntry.Args = append(templateDataEntry.Args, templateArgs{Args: arg, Action: syscall.Action})
-
+			if (len(syscall.Includes.Arches) == 0 || contains(syscall.Includes.Arches, "amd64")) && len(syscall.Includes.Caps) == 0 && len(syscall.Excludes.Caps) == 0 {
+				templateDataEntry := templateSyscall{
+					Name: name,
+					Nr:   syscallsMap[name],
 				}
-				templateDataEntry.Action = profile.DefaultAction
-			} else {
-				templateDataEntry.Action = syscall.Action
+
+				if len(syscall.Args) > 0 {
+					// Preserve args if syscall already exists
+					templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
+
+					for _, arg := range syscall.Args {
+						templateDataEntry.Args = append(templateDataEntry.Args, templateArgs{Args: arg, Action: syscall.Action})
+
+					}
+					templateDataEntry.Action = profile.DefaultAction
+				} else {
+					templateDataEntry.Action = syscall.Action
+				}
+				templateData.Syscalls[name] = templateDataEntry
+				delete(syscallsMap, name)
 			}
-			templateData.Syscalls[name] = templateDataEntry
-			delete(syscallsMap, name)
 		}
 	}
 
 	for name, nr := range syscallsMap {
+		fmt.Println(name)
 		templateData.Syscalls[name] = templateSyscall{
-			Name: name,
-			Nr:   nr,
-			Args: []templateArgs{{Action: profile.DefaultAction}},
+			Name:   name,
+			Nr:     nr,
+			Action: profile.DefaultAction,
 		}
 	}
 
