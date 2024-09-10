@@ -50,7 +50,8 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 	templateData := TemplateData{Name: gadgetName, Syscalls: make(map[string]templateSyscall)}
 	for _, syscall := range profile.Syscalls {
 		for _, name := range syscall.Names {
-			if (len(syscall.Includes.Arches) == 0 || contains(syscall.Includes.Arches, "amd64")) && len(syscall.Includes.Caps) == 0 && len(syscall.Excludes.Caps) == 0 {
+			_, ok := syscallsMap[name]
+			if (len(syscall.Includes.Arches) == 0 || contains(syscall.Includes.Arches, "amd64")) && len(syscall.Includes.Caps) == 0 && len(syscall.Excludes.Caps) == 0 && ok {
 				templateDataEntry := templateSyscall{
 					Name: name,
 					Nr:   syscallsMap[name],
