@@ -35,6 +35,10 @@ int tracepoint__sys_enter_{{$syscall.Name}}(struct trace_event_raw_sys_enter *ct
   {{end}}
   {
         {{if ne $arg.Action "SCMP_ACT_ALLOW"}}
+              u64 mntns_id = gadget_get_mntns_id();                      
+		if (gadget_should_discard_mntns_id(mntns_id))          
+			return 0;                                      
+
     {{if eq $arg.Action "SCMP_ACT_ERRNO"}}
 	  u64 pid_tgid = bpf_get_current_pid_tgid();
 	  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
@@ -48,6 +52,9 @@ int tracepoint__sys_enter_{{$syscall.Name}}(struct trace_event_raw_sys_enter *ct
   {{end}}
 
     {{if ne $syscall.Action "SCMP_ACT_ALLOW"}}
+                  u64 mntns_id = gadget_get_mntns_id();                      
+		if (gadget_should_discard_mntns_id(mntns_id))          
+			return 0;                                      
     {{if eq $syscall.Action "SCMP_ACT_ERRNO"}}
 	  u64 pid_tgid = bpf_get_current_pid_tgid();
 	  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);

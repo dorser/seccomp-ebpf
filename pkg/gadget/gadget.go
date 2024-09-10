@@ -75,7 +75,6 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 	}
 
 	for name, nr := range syscallsMap {
-		fmt.Println(name)
 		templateData.Syscalls[name] = templateSyscall{
 			Name:   name,
 			Nr:     nr,
