@@ -16,57 +16,53 @@
 static const bool false_value = false;
 
 struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 10240);
-	__type(key, u64);
-	__type(value, bool);
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(max_entries, 10240);
+  __type(key, u64);
+  __type(value, bool);
 } block_actions SEC(".maps");
 
-
-{{range $syscall := .Syscalls}}
-SEC("tracepoint/syscalls/sys_enter_{{$syscall.Name}}")
-int tracepoint__sys_enter_{{$syscall.Name}}(struct trace_event_raw_sys_enter *ctx) {
-  {{- range $arg := $syscall.Args -}}
-  {{if ne $arg.Args.Op ""}}
-  {{if eq $arg.Args.Op "&"}}
-  if (({{$arg.Args.Value}} {{$arg.Args.Op}} ctx->args[{{$arg.Args.Index}}]) == {{$arg.Args.ValueTwo}}) 
-  {{else}}
-  if (ctx->args[{{$arg.Args.Index}}] {{$arg.Args.Op}} {{$arg.Args.Value}}) 
-  {{end}}
+{{ range $syscall := .Syscalls }}
+SEC("tracepoint/syscalls/sys_enter_{{ $syscall.Name }}")
+int tracepoint__sys_enter_{{ $syscall.Name }}(struct trace_event_raw_sys_enter *ctx) 
+{
+  {{- range $arg := $syscall.Args -}} 
+  {{ if ne $arg.Args.Op "" }} 
+  {{ if eq $arg.Args.Op "&" }}
+  if (({{ $arg.Args.Value }} {{ $arg.Args.Op }} ctx->args[{{ $arg.Args.Index }}]) == {{ $arg.Args.ValueTwo }}) 
+  {{ else }}
+  if (ctx->args[{{ $arg.Args.Index }}] {{ $arg.Args.Op }} {{ $arg.Args.Value }}) 
+  {{ end }}
   {
-        {{if ne $arg.Action "SCMP_ACT_ALLOW"}}
-              u64 mntns_id = gadget_get_mntns_id();                      
-		if (gadget_should_discard_mntns_id(mntns_id))          
-			return 0;                                      
+    {{ if ne $arg.Action "SCMP_ACT_ALLOW" }}
+    u64 mntns_id = gadget_get_mntns_id();
+    if (gadget_should_discard_mntns_id(mntns_id))
+      return 0;
 
-    {{if eq $arg.Action "SCMP_ACT_ERRNO"}}
-	  u64 pid_tgid = bpf_get_current_pid_tgid();
-	  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
-
-    {{else}}
-    {{$arg.Action}}
-    {{end}}
-	{{end}}
+    {{ if eq $arg.Action "SCMP_ACT_ERRNO" }}
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
+    {{ else }} 
+    {{ $arg.Action }} 
+    {{ end }} 
+    {{ end }}
   }
-  {{end}}
-  {{end}}
-
-    {{if ne $syscall.Action "SCMP_ACT_ALLOW"}}
-                  u64 mntns_id = gadget_get_mntns_id();                      
-		if (gadget_should_discard_mntns_id(mntns_id))          
-			return 0;                                      
-    {{if eq $syscall.Action "SCMP_ACT_ERRNO"}}
-	  u64 pid_tgid = bpf_get_current_pid_tgid();
-	  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
-
-    {{else}}
-    {{$syscall.Action}}
-    {{end}}
-	{{end}}
+  {{ end }} 
+  {{ end }}
+  {{ if ne $syscall.Action "SCMP_ACT_ALLOW" }}
+  u64 mntns_id = gadget_get_mntns_id();
+  if (gadget_should_discard_mntns_id(mntns_id))
     return 0;
+  {{ if eq $syscall.Action "SCMP_ACT_ERRNO" }}
+  u64 pid_tgid = bpf_get_current_pid_tgid();
+  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
 
-
+  {{ else }} 
+  {{ $syscall.Action }} 
+  {{ end }} 
+  {{ end }}
+  return 0;
 }
-{{end}}
+{{ end }}
 
-char LICENSE[] SEC("license") = "GPL";		
+char LICENSE[] SEC("license") = "GPL";
