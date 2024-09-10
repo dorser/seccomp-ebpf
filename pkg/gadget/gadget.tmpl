@@ -13,55 +13,46 @@
 #define TASK_COMM_LEN 16
 #endif
 
-struct event {
-  gadget_syscall syscall_raw;
-  gadget_timestamp timestamp;
-  gadget_mntns_id mntns_id;
-  __u32 pid;
-  __u8 comm[TASK_COMM_LEN];
-};
+static const bool false_value = false;
 
-GADGET_TRACER_MAP(events, 1024 * 256);
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 10240);
+	__type(key, u64);
+	__type(value, bool);
+} block_actions SEC(".maps");
 
-GADGET_TRACER({{.Name}}_tracer, events, event);
 
 {{range $syscall := .Syscalls}}
 SEC("tracepoint/syscalls/sys_enter_{{$syscall.Name}}")
 int tracepoint__sys_enter_{{$syscall.Name}}(struct trace_event_raw_sys_enter *ctx) {
-  struct event *event;
-  __u64 pid_tgid = bpf_get_current_pid_tgid();
   {{- range $arg := $syscall.Args -}}
-  {{if eq $arg.Op "&"}}
-  if (({{$arg.Value}} {{$arg.Op}} ctx->args[{{$arg.Index}}]) == {{$arg.ValueTwo}}) {
+  {{if ne $arg.Args.Op ""}}
+  {{if eq $arg.Args.Op "&"}}
+  if (({{$arg.Args.Value}} {{$arg.Args.Op}} ctx->args[{{$arg.Args.Index}}]) == {{$arg.Args.ValueTwo}}) 
   {{else}}
-  if (ctx->args[{{$arg.Index}}] {{$arg.Op}} {{$arg.Value}}) {
+  if (ctx->args[{{$arg.Args.Index}}] {{$arg.Args.Op}} {{$arg.Args.Value}}) 
   {{end}}
-  {{if eq $syscall.Action "SCMP_ACT_ALLOW"}}
+  {
+    {{if eq $arg.Action "SCMP_ACT_ALLOW"}}
     return 0;
-  }
-  {{else}}
-    continue;
-  else {
-    return 0;
+    {{end}}
   }
   {{end}}
   {{end}}
 
-  event = gadget_reserve_buf(&events, sizeof(*event));
-  if (!event)
+    {{if ne $syscall.Action "SCMP_ACT_ALLOW"}}
+    {{if eq $syscall.Action "SCMP_ACT_ERRNO"}}
+	  u64 pid_tgid = bpf_get_current_pid_tgid();
+	  bpf_map_update_elem(&block_actions, &pid_tgid, &false_value, BPF_NOEXIST);
+
+    {{else}}
+    {{$syscall.Action}}
+    {{end}}
+	{{end}}
     return 0;
-    
-  /* event data */
-  event->syscall_raw = {{$syscall.Nr}};
-  event->timestamp = bpf_ktime_get_boot_ns();
-  event->mntns_id = gadget_get_mntns_id();
-  event->pid = pid_tgid >> 32;
-  bpf_get_current_comm(&event->comm, sizeof(event->comm));
 
-  /* emit event */
-  gadget_submit_buf(ctx, &events, event, sizeof(*event));
 
-  return 0;
 }
 {{end}}
 

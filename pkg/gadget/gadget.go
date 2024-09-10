@@ -9,11 +9,16 @@ import (
 	"text/template"
 )
 
+type templateArgs struct {
+	Args   seccomp.Arg
+	Action string
+}
+
 type templateSyscall struct {
 	Name   string
 	Nr     int64
+	Args   []templateArgs
 	Action string
-	Args   []seccomp.Arg
 }
 
 type TemplateData struct {
@@ -37,13 +42,22 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 	for _, syscall := range profile.Syscalls {
 		for _, name := range syscall.Names {
 			templateDataEntry := templateSyscall{
-				Name:   name,
-				Nr:     syscallsMap[name],
-				Action: syscall.Action,
+				Name: name,
+				Nr:   syscallsMap[name],
 			}
 
-			templateDataEntry.Args = append(templateDataEntry.Args, syscall.Args...)
-			templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
+			if len(syscall.Args) > 0 {
+				// Preserve already existing syscalls
+				templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
+
+				for _, arg := range syscall.Args {
+					templateDataEntry.Args = append(templateDataEntry.Args, templateArgs{Args: arg, Action: syscall.Action})
+
+				}
+				templateDataEntry.Action = profile.DefaultAction
+			} else {
+				templateDataEntry.Action = syscall.Action
+			}
 			templateData.Syscalls[name] = templateDataEntry
 			delete(syscallsMap, name)
 		}
@@ -51,9 +65,9 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 
 	for name, nr := range syscallsMap {
 		templateData.Syscalls[name] = templateSyscall{
-			Name:   name,
-			Nr:     nr,
-			Action: profile.DefaultAction,
+			Name: name,
+			Nr:   nr,
+			Args: []templateArgs{{Action: profile.DefaultAction}},
 		}
 	}
 
