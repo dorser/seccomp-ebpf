@@ -36,17 +36,15 @@ func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (str
 	templateData := TemplateData{Name: gadgetName, Syscalls: make(map[string]templateSyscall)}
 	for _, syscall := range profile.Syscalls {
 		for _, name := range syscall.Names {
-			if syscall.Action != "SCMP_ACT_ALLOW" || len(syscall.Args) > 0 {
-				templateDataEntry := templateSyscall{
-					Name:   name,
-					Nr:     syscallsMap[name],
-					Action: syscall.Action,
-				}
-
-				templateDataEntry.Args = append(templateDataEntry.Args, syscall.Args...)
-				templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
-				templateData.Syscalls[name] = templateDataEntry
+			templateDataEntry := templateSyscall{
+				Name:   name,
+				Nr:     syscallsMap[name],
+				Action: syscall.Action,
 			}
+
+			templateDataEntry.Args = append(templateDataEntry.Args, syscall.Args...)
+			templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
+			templateData.Syscalls[name] = templateDataEntry
 			delete(syscallsMap, name)
 		}
 	}
