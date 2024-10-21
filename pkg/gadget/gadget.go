@@ -1,95 +1,70 @@
 package gadget
 
 import (
-	_ "embed"
-	"fmt"
-	"github.com/dorser/seccomp-ebpf/pkg/seccomp"
-	"github.com/dorser/seccomp-ebpf/pkg/syscalls"
-	"strings"
-	"text/template"
+	// _ "embed"
+	"github.com/containers/common/pkg/seccomp"
 )
 
-type templateArgs struct {
-	Args   seccomp.Arg
-	Action string
+type Rule struct {
+	Action seccomp.Action
 }
 
-type templateSyscall struct {
-	Name   string
-	Nr     int64
-	Args   []templateArgs
-	Action string
+type Rules []Rule
+
+type TemplateProfile struct {
+	Name          string
+	DefaultAction seccomp.Action
+	Syscalls      map[string]Rules
 }
 
-type TemplateData struct {
-	Name     string
-	Syscalls map[string]templateSyscall
-}
+// //go:embed gadget.tmpl
+// var gadgetTemplate string
 
-//go:embed gadget.tmpl
-var gadgetTemplate string
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
+func shouldDiscardSyscall(_ *seccomp.Syscall) bool {
 	return false
 }
 
-func GenerateGadgetCode(gadgetName string, profile *seccomp.SeccompProfile) (string, error) {
-
-	tmpl, err := template.New("gadgetTemplate").Parse(gadgetTemplate)
-	if err != nil {
-		return "", fmt.Errorf("Error parsing template: %v", err)
+func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) (TemplateProfile, error) {
+	templateProfile := TemplateProfile{
+		Name:          profileName,
+		DefaultAction: seccompProfile.DefaultAction,
+		Syscalls:      make(map[string]Rules),
 	}
 
-	syscallsMap := syscalls.LoadSystemMap("x86_64")
+	for _, seccompSyscall := range seccompProfile.Syscalls {
+		if !shouldDiscardSyscall(seccompSyscall) {
+			syscallNames := seccompSyscall.Names
 
-	templateData := TemplateData{Name: gadgetName, Syscalls: make(map[string]templateSyscall)}
-	for _, syscall := range profile.Syscalls {
-		for _, name := range syscall.Names {
-			_, ok := syscallsMap[name]
-			if (len(syscall.Includes.Arches) == 0 || contains(syscall.Includes.Arches, "amd64")) && len(syscall.Includes.Caps) == 0 && len(syscall.Excludes.Caps) == 0 && ok {
-				templateDataEntry := templateSyscall{
-					Name: name,
-					Nr:   syscallsMap[name],
+			// If "Name" is set, we ignore "Names"
+			if seccompSyscall.Name != "" {
+				syscallNames = []string{seccompSyscall.Name}
+			}
+
+			for _, syscallName := range syscallNames {
+				if _, exists := templateProfile.Syscalls[syscallName]; !exists {
+					templateProfile.Syscalls[syscallName] = Rules{}
 				}
 
-				if len(syscall.Args) > 0 {
-					// Preserve args if syscall already exists
-					templateDataEntry.Args = append(templateDataEntry.Args, templateData.Syscalls[name].Args...)
-
-					for _, arg := range syscall.Args {
-						templateDataEntry.Args = append(templateDataEntry.Args, templateArgs{Args: arg, Action: syscall.Action})
-
-					}
-					templateDataEntry.Action = profile.DefaultAction
-				} else {
-					templateDataEntry.Action = syscall.Action
-				}
-				templateData.Syscalls[name] = templateDataEntry
-				delete(syscallsMap, name)
+				templateProfile.Syscalls[syscallName] = append(templateProfile.Syscalls[syscallName], Rule{Action: seccompSyscall.Action})
 			}
 		}
 	}
 
-	for name, nr := range syscallsMap {
-		templateData.Syscalls[name] = templateSyscall{
-			Name:   name,
-			Nr:     nr,
-			Action: profile.DefaultAction,
-		}
-	}
+	return templateProfile, nil
+}
 
-	var output strings.Builder
-
-	err = tmpl.Execute(&output, templateData)
+func generateGadgetTemplate(profileName string, seccompProfile *seccomp.Seccomp) error {
+	_, err := seccompToTemplateData(profileName, seccompProfile)
 	if err != nil {
-		return "", fmt.Errorf("Error executing template: %v", err)
+		return err
 	}
+	return nil
+}
 
-	return output.String(), nil
-
+func GenerateGadget(profileName string, seccompProfile *seccomp.Seccomp) error {
+	err := generateGadgetTemplate(profileName, seccompProfile)
+	if err != nil {
+		return err
+	}
+	return nil
 }
