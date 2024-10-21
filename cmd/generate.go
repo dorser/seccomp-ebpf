@@ -1,13 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/dorser/seccomp-ebpf/pkg/gadget"
-	"github.com/dorser/seccomp-ebpf/pkg/seccomp"
+	"github.com/containers/common/pkg/seccomp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -23,24 +21,19 @@ func generateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "Generate eBPF gadgets from a seccomp profile",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			profile, err := seccomp.LoadProfile(opts.profilePath)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			seccompProfileJSON, err := os.ReadFile(opts.profilePath)
 			if err != nil {
-				return fmt.Errorf("load seccomp profile: %v", err)
+				return fmt.Errorf("opening seccomp profile failed: %w", err)
+			}
+
+			var seccompProfile seccomp.Seccomp
+			err = json.Unmarshal(seccompProfileJSON, &seccompProfile)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling JSON: %v", err)
 			}
 
 			logrus.Infof("Loaded seccomp profile successfully!")
-			gadgetCode, err := gadget.GenerateGadgetCode(getGadgetNameFromProfilePath(opts.profilePath), profile)
-			if err != nil {
-				return fmt.Errorf("generate gadget code: %v", err)
-			}
-
-			err = os.WriteFile(opts.outputPath, []byte(gadgetCode), 0644)
-			if err != nil {
-				return fmt.Errorf("write gadget code to file: %v", err)
-			}
-
-			logrus.Infof("Gadget code generated and saved to %s\n", opts.outputPath)
 
 			return nil
 		},
@@ -52,8 +45,4 @@ func generateCmd() *cobra.Command {
 		logrus.Warnf("mark profile flag required: %s", err.Error())
 	}
 	return cmd
-}
-
-func getGadgetNameFromProfilePath(path string) string {
-	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
