@@ -57,8 +57,6 @@ int tracepoint__sys_enter(struct bpf_raw_tracepoint_args *ctx) {
 
   return 0;
 }
-
-
 {{ range $syscallName, $syscall  := .Syscalls }}
 SEC("tracepoint/syscalls/sys_enter_{{ $syscallName }}")
 int tracepoint__sys_enter_{{ $syscallName }}(struct trace_event_raw_sys_enter *ctx) 
@@ -66,12 +64,25 @@ int tracepoint__sys_enter_{{ $syscallName }}(struct trace_event_raw_sys_enter *c
   u64 mntns_id = gadget_get_mntns_id();
   if (gadget_should_discard_mntns_id(mntns_id))
     return 0;
-
   u64 pid_tgid = bpf_get_current_pid_tgid();
-  bpf_map_update_elem(&actions, &pid_tgid, &{{ (index $syscall 0).Action }}, BPF_NOEXIST);
+  {{- range $rule := $syscall }}
+  {{- /* TODO: iterate over args. For now we assume it is an array with a single element */}}
+  {{ if $rule.Args -}}
+  {{ if eq (index $rule.Args 0).Op "&" }}
+  if (({{ (index $rule.Args 0).Value }} {{ (index $rule.Args 0).Op }} ctx->args[{{ (index $rule.Args 0).Index }}]) == {{ (index $rule.Args 0).ValueTwo }}) 
+  {{ else }}
+  if (ctx->args[{{ (index $rule.Args 0).Index }}] {{ (index $rule.Args 0).Op }} {{ (index $rule.Args 0).Value }}) 
+  {{ end -}}
+  {
+  {{ end -}}
+  bpf_map_update_elem(&actions, &pid_tgid, &{{ $rule.Action }}, BPF_NOEXIST);
+  {{- if $rule.Args }}
+  }
 
+  {{- end -}}
+  {{- end }}
+  
   return 0;
 }
 {{ end }}
-
 char LICENSE[] SEC("license") = "GPL";
