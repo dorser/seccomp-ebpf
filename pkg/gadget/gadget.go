@@ -49,7 +49,7 @@ type Arg struct {
 	Op       string `json:"op"`
 }
 
-type Syscall struct {
+type SyscallRule struct {
 	Action   seccomp.Action
 	Args     []Arg
 	Includes seccomp.Filter
@@ -57,10 +57,15 @@ type Syscall struct {
 	Errno    string
 }
 
+type Syscall struct {
+	Rules       []SyscallRule
+	ArgsIndices map[uint]uint
+}
+
 type TemplateProfile struct {
 	Name          string
 	DefaultAction seccomp.Action
-	Syscalls      map[string][]Syscall
+	Syscalls      map[string]Syscall
 }
 
 //go:embed gadget.tmpl
@@ -93,7 +98,7 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 	templateProfile := TemplateProfile{
 		Name:          profileName,
 		DefaultAction: defaultAction,
-		Syscalls:      make(map[string][]Syscall),
+		Syscalls:      make(map[string]Syscall),
 	}
 
 	for _, seccompSyscall := range seccompProfile.Syscalls {
@@ -108,9 +113,14 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 			for _, syscallName := range syscallNames {
 				if !shouldDiscardSyscallByName(syscallName) {
 					if _, exists := templateProfile.Syscalls[syscallName]; !exists {
-						templateProfile.Syscalls[syscallName] = []Syscall{}
+						templateProfile.Syscalls[syscallName] = Syscall{
+							Rules:       []SyscallRule{},
+							ArgsIndices: make(map[uint]uint),
+						}
 					}
 
+					syscallRules := templateProfile.Syscalls[syscallName].Rules
+					argsIndices := templateProfile.Syscalls[syscallName].ArgsIndices
 					args := []Arg{}
 					for _, seccompArg := range seccompSyscall.Args {
 						op, err := convertSeccompOperator(seccompArg.Op)
@@ -118,6 +128,9 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 							return TemplateProfile{}, err
 						}
 
+						if _, exists := argsIndices[seccompArg.Index]; !exists {
+							argsIndices[seccompArg.Index] = seccompArg.Index
+						}
 						args = append(args, Arg{
 							Index:    seccompArg.Index,
 							Value:    seccompArg.Value,
@@ -125,7 +138,7 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 							Op:       op,
 						})
 					}
-					syscallRule := Syscall{
+					syscallRule := SyscallRule{
 						Action:   seccompSyscall.Action,
 						Args:     args,
 						Includes: seccompSyscall.Includes,
@@ -133,7 +146,11 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 						Errno:    seccompSyscall.Errno,
 					}
 
-					templateProfile.Syscalls[syscallName] = append(templateProfile.Syscalls[syscallName], syscallRule)
+					syscallRules = append(syscallRules, syscallRule)
+					templateProfile.Syscalls[syscallName] = Syscall{
+						Rules:       syscallRules,
+						ArgsIndices: argsIndices,
+					}
 				}
 			}
 		}
