@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -71,8 +72,24 @@ type TemplateProfile struct {
 //go:embed gadget.tmpl
 var gadgetTemplate string
 
-func shouldDiscardSyscallObject(_ *seccomp.Syscall) bool {
-	return false
+func shouldDiscardSyscallObject(seccompSyscall *seccomp.Syscall, arch string) bool {
+	// Defaulting to x86_64
+	if arch == "" {
+		// https://github.com/seccomp/libseccomp-golang/blob/main/seccomp.go#L327
+		arch = "amd64"
+	}
+
+	var isArchIncluded bool = true
+	if len(seccompSyscall.Includes.Arches) > 0 {
+		isArchIncluded = slices.Contains(seccompSyscall.Includes.Arches, arch)
+	}
+
+	var isArchExcluded bool = false
+	if len(seccompSyscall.Includes.Arches) > 0 {
+		isArchExcluded = slices.Contains(seccompSyscall.Excludes.Arches, arch)
+	}
+
+	return !isArchIncluded || isArchExcluded
 }
 
 func tracepointExists(syscallName string) bool {
@@ -102,7 +119,7 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 	}
 
 	for _, seccompSyscall := range seccompProfile.Syscalls {
-		if !shouldDiscardSyscallObject(seccompSyscall) {
+		if !shouldDiscardSyscallObject(seccompSyscall, "") {
 			syscallNames := seccompSyscall.Names
 
 			// If "Name" is set, we ignore "Names"
