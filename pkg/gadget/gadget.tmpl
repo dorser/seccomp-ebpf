@@ -9,15 +9,23 @@
 #include <gadget/mntns_filter.h>
 #include <gadget/types.h>
 
+#ifndef SIGKILL
+#define SIGKILL 9
+#endif
+
+#ifndef SIGSYS
+#define SIGSYS 12
+#endif
+
 const uint SCMP_ACT_KILL = 1;
+const uint SCMP_ACT_KILL_THREAD = 1;
 const uint SCMP_ACT_KILL_PROCESS = 2;
-const uint SCMP_ACT_KILL_THREAD = 3;
-const uint SCMP_ACT_TRAP = 4;
-const uint SCMP_ACT_ERRNO = 5;
-const uint SCMP_ACT_TRACE = 6;
-const uint SCMP_ACT_ALLOW = 7;
-const uint SCMP_ACT_LOG = 8;
-const uint SCMP_ACT_NOTIFY = 9;
+const uint SCMP_ACT_TRAP = 3;
+const uint SCMP_ACT_TRACE = 4;
+const uint SCMP_ACT_LOG = 4;
+const uint SCMP_ACT_NOTIFY = 4;
+const uint SCMP_ACT_ALLOW = 5;
+const uint SCMP_ACT_ERRNO = 6;
 
 struct event {
   gadget_syscall syscall_raw;
@@ -36,24 +44,47 @@ struct {
 
 SEC("raw_tracepoint/sys_enter")
 int tracepoint__sys_enter(struct bpf_raw_tracepoint_args *ctx) {
-    struct event *event;
+  struct event *event;
   __u64 pid_tgid = bpf_get_current_pid_tgid();
-
   __u64 mntns_id = gadget_get_mntns_id();
+  uint *map_action;
+  uint action;
+
   if (gadget_should_discard_mntns_id(mntns_id))
     return 0;
 
-  uint *action = bpf_map_lookup_elem(&actions, &pid_tgid);
-  if (!action) {
-    action = &{{ .DefaultAction }};
+  map_action = bpf_map_lookup_elem(&actions, &pid_tgid);
+  if (map_action) {
+    action = *map_action;
+    if (action != SCMP_ACT_ERRNO) {
+     bpf_map_delete_elem(&actions, &pid_tgid);
+    }
+  } else {
+    action = {{ .DefaultAction }};
+    if (action == SCMP_ACT_ERRNO) {
+      bpf_map_update_elem(&actions, &pid_tgid, &action, BPF_NOEXIST);
+    }
+  }
+
+  switch (action) {
+    case SCMP_ACT_KILL_THREAD:
+      bpf_send_signal_thread(SIGSYS);
+      bpf_send_signal_thread(SIGKILL);
+    case SCMP_ACT_KILL_PROCESS:
+      bpf_send_signal(SIGSYS);
+      bpf_send_signal(SIGKILL);
+    case SCMP_ACT_TRAP:
+      bpf_send_signal(SIGSYS);
   }
   
-  event = gadget_reserve_buf(&events, sizeof(*event));
-  if (!event)
-    return 0;
-  event->syscall_raw = ctx->args[1];
-  event->action = *action;
-  gadget_submit_buf(ctx, &events, event, sizeof(*event));
+  if (action != SCMP_ACT_ALLOW) {
+    event = gadget_reserve_buf(&events, sizeof(*event));
+    if (!event)
+      return 0;
+    event->syscall_raw = ctx->args[1];
+    event->action = action;
+    gadget_submit_buf(ctx, &events, event, sizeof(*event));
+  }
 
   return 0;
 }
