@@ -3,12 +3,12 @@ package gadget
 import (
 	_ "embed"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 	"text/template"
 
 	"github.com/containers/common/pkg/seccomp"
+	"github.com/dorser/seccomp-ebpf/pkg/tracepoints"
 	"github.com/sirupsen/logrus"
 )
 
@@ -93,16 +93,11 @@ func shouldDiscardSyscallObject(seccompSyscall *seccomp.Syscall, arch string) bo
 }
 
 func tracepointExists(syscallName string) bool {
-	tracepointBase := "/sys/kernel/tracing/events/syscalls/sys_enter_"
-	if _, err := os.Stat(tracepointBase + syscallName); err != nil {
-		if os.IsNotExist(err) {
-			logrus.Warnf("tracepoint doesn't exist for: %s", syscallName)
-			return false
-		}
-		logrus.Errorf("error reading format for syscall: %s. error: %v", syscallName, err)
-		return false
+	exists := tracepoints.SyscallHasEnterTracepoint(syscallName)
+	if !exists {
+		logrus.Warnf("tracepoint doesn't exist for: %s", syscallName)
 	}
-	return true
+	return exists
 }
 
 func shouldDiscardSyscallByName(syscallName string) bool {
