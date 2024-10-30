@@ -56,12 +56,14 @@ func generateCmd() *cobra.Command {
 			}
 
 			profileName := getProfileName(opts)
-			gadgetCode, err := gadget.GenerateGadget(profileName, seccompProfile)
+			gadgetFiles, err := gadget.GenerateGadget(profileName, seccompProfile)
 			if err != nil {
 				return err
 			}
 
-			os.WriteFile(opts.outputPath, []byte(gadgetCode), 0644)
+			for filename, data := range gadgetFiles {
+				os.WriteFile(opts.outputPath+filename, []byte(data), 0644)
+			}
 
 			logrus.Infof("Loaded seccomp profile successfully!")
 
@@ -71,7 +73,7 @@ func generateCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&opts.profilePath, "profile", "p", "", "Path to the seccomp profile (required)")
 	cmd.Flags().StringVarP(&opts.profileName, "name", "n", "", "The name of the generated profile gadget")
-	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", "gadget/program.bpf.c", "Path to save the generated gadget code")
+	cmd.Flags().StringVarP(&opts.outputPath, "output", "o", "gadget/", "Path to the output directory to save the generated gadget code")
 	if err := cmd.MarkFlagRequired("profile"); err != nil {
 		logrus.Warnf("mark profile flag required: %s", err.Error())
 	}

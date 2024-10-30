@@ -1,13 +1,15 @@
 package gadget
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/template"
 
 	"github.com/containers/common/pkg/seccomp"
+	"github.com/dorser/seccomp-ebpf/pkg/syscalls"
 	"github.com/dorser/seccomp-ebpf/pkg/tracepoints"
 	"github.com/sirupsen/logrus"
 )
@@ -64,13 +66,17 @@ type Syscall struct {
 }
 
 type TemplateProfile struct {
-	Name          string
-	DefaultAction seccomp.Action
-	Syscalls      map[string]Syscall
+	Name           string
+	DefaultAction  seccomp.Action
+	Syscalls       map[string]Syscall
+	RawTracepoints map[string]seccomp.Action
 }
 
 //go:embed gadget.tmpl
 var gadgetTemplate string
+
+//go:embed include
+var includeFiles embed.FS
 
 func shouldDiscardSyscallObject(seccompSyscall *seccomp.Syscall, arch string) bool {
 	// Defaulting to x86_64
@@ -95,22 +101,27 @@ func shouldDiscardSyscallObject(seccompSyscall *seccomp.Syscall, arch string) bo
 func tracepointExists(syscallName string) bool {
 	exists := tracepoints.SyscallHasEnterTracepoint(syscallName)
 	if !exists {
-		logrus.Warnf("tracepoint doesn't exist for: %s", syscallName)
+		logrus.Warnf("tracepoint doesn't exist for: %s. Using raw tracepoint", syscallName)
 	}
 	return exists
 }
 
 func shouldDiscardSyscallByName(syscallName string) bool {
-	return !tracepointExists(syscallName)
+	exists := syscalls.SyscallExists(syscallName)
+	if !exists {
+		logrus.Warnf("syscall %s doesn't exist. Ignoring.", syscallName)
+	}
+	return !exists
 }
 
 func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) (TemplateProfile, error) {
 	defaultAction := seccompProfile.DefaultAction
 
 	templateProfile := TemplateProfile{
-		Name:          profileName,
-		DefaultAction: defaultAction,
-		Syscalls:      make(map[string]Syscall),
+		Name:           profileName,
+		DefaultAction:  defaultAction,
+		Syscalls:       make(map[string]Syscall),
+		RawTracepoints: make(map[string]seccomp.Action),
 	}
 
 	for _, seccompSyscall := range seccompProfile.Syscalls {
@@ -124,44 +135,50 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 
 			for _, syscallName := range syscallNames {
 				if !shouldDiscardSyscallByName(syscallName) {
-					if _, exists := templateProfile.Syscalls[syscallName]; !exists {
+					if tracepointExists(syscallName) {
+						if _, exists := templateProfile.Syscalls[syscallName]; !exists {
+							templateProfile.Syscalls[syscallName] = Syscall{
+								Rules:       []SyscallRule{},
+								ArgsIndices: make(map[uint]uint),
+							}
+						}
+
+						syscallRules := templateProfile.Syscalls[syscallName].Rules
+						argsIndices := templateProfile.Syscalls[syscallName].ArgsIndices
+						args := []Arg{}
+						for _, seccompArg := range seccompSyscall.Args {
+							op, err := convertSeccompOperator(seccompArg.Op)
+							if err != nil {
+								return TemplateProfile{}, err
+							}
+
+							if _, exists := argsIndices[seccompArg.Index]; !exists {
+								argsIndices[seccompArg.Index] = seccompArg.Index
+							}
+							args = append(args, Arg{
+								Index:    seccompArg.Index,
+								Value:    seccompArg.Value,
+								ValueTwo: seccompArg.ValueTwo,
+								Op:       op,
+							})
+						}
+						syscallRule := SyscallRule{
+							Action:   seccompSyscall.Action,
+							Args:     args,
+							Includes: seccompSyscall.Includes,
+							Excludes: seccompSyscall.Excludes,
+							Errno:    seccompSyscall.Errno,
+						}
+
+						syscallRules = append(syscallRules, syscallRule)
 						templateProfile.Syscalls[syscallName] = Syscall{
-							Rules:       []SyscallRule{},
-							ArgsIndices: make(map[uint]uint),
+							Rules:       syscallRules,
+							ArgsIndices: argsIndices,
 						}
-					}
-
-					syscallRules := templateProfile.Syscalls[syscallName].Rules
-					argsIndices := templateProfile.Syscalls[syscallName].ArgsIndices
-					args := []Arg{}
-					for _, seccompArg := range seccompSyscall.Args {
-						op, err := convertSeccompOperator(seccompArg.Op)
-						if err != nil {
-							return TemplateProfile{}, err
-						}
-
-						if _, exists := argsIndices[seccompArg.Index]; !exists {
-							argsIndices[seccompArg.Index] = seccompArg.Index
-						}
-						args = append(args, Arg{
-							Index:    seccompArg.Index,
-							Value:    seccompArg.Value,
-							ValueTwo: seccompArg.ValueTwo,
-							Op:       op,
-						})
-					}
-					syscallRule := SyscallRule{
-						Action:   seccompSyscall.Action,
-						Args:     args,
-						Includes: seccompSyscall.Includes,
-						Excludes: seccompSyscall.Excludes,
-						Errno:    seccompSyscall.Errno,
-					}
-
-					syscallRules = append(syscallRules, syscallRule)
-					templateProfile.Syscalls[syscallName] = Syscall{
-						Rules:       syscallRules,
-						ArgsIndices: argsIndices,
+					} else {
+						// We currently do not support filters for syscalls that doesn't have tracepoints
+						// This is a naive approach, as it'll take the action of last rule processed for this syscall
+						templateProfile.RawTracepoints["__NR_"+syscallName] = seccompSyscall.Action
 					}
 				}
 			}
@@ -191,11 +208,31 @@ func generateGadgetTemplate(profileName string, seccompProfile *seccomp.Seccomp)
 	return output.String(), nil
 }
 
-func GenerateGadget(profileName string, seccompProfile *seccomp.Seccomp) (string, error) {
+func GenerateGadget(profileName string, seccompProfile *seccomp.Seccomp) (map[string]string, error) {
 	gadgetCode, err := generateGadgetTemplate(profileName, seccompProfile)
+	gadgetFiles := make(map[string]string)
 	if err != nil {
-		return "", err
+		return gadgetFiles, err
 	}
 
-	return gadgetCode, nil
+	gadgetFiles["program.bpf.c"] = gadgetCode
+	files, err := includeFiles.ReadDir("include")
+	if err != nil {
+		return gadgetFiles, fmt.Errorf("reading include: %w", err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		data, err := includeFiles.ReadFile(filepath.Join("include", file.Name()))
+		if err != nil {
+			return gadgetFiles, fmt.Errorf("reading include file: %w", err)
+		}
+
+		gadgetFiles[file.Name()] = string(data)
+	}
+
+	return gadgetFiles, nil
 }

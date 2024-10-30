@@ -1,3 +1,5 @@
+#include "syscall_compat.h"
+
 #include <vmlinux.h>
 
 #include <bpf/bpf_core_read.h>
@@ -21,6 +23,7 @@
 #define SIGSYS 12
 #endif
 
+const uint SCMP_ACT_UNDEFINED = 0;
 const uint SCMP_ACT_KILL = 1;
 const uint SCMP_ACT_KILL_THREAD = 1;
 const uint SCMP_ACT_KILL_PROCESS = 2;
@@ -207,7 +210,7 @@ enum lsm_tracepoint { FOR_EACH_LSM_HOOK(ENUM_ITEM) };
 	{                                                                        \
     u64 pid_tgid = bpf_get_current_pid_tgid();                             \
     uint *action = bpf_map_lookup_elem(&actions, &pid_tgid);               \
-    if (action) {                                                          \ 
+    if (action) {                                                          \
       bpf_map_delete_elem(&actions, &pid_tgid);                            \
       return -EPERM;                                                       \
     }                                                                      \
@@ -215,6 +218,13 @@ enum lsm_tracepoint { FOR_EACH_LSM_HOOK(ENUM_ITEM) };
 	}
 
 FOR_EACH_LSM_HOOK(TRACE_LSM)
+
+int syscall_actions[500] = {
+  {{ range $syscallNr, $syscallAction  := .RawTracepoints -}}
+  [{{ $syscallNr }}] = {{ $syscallAction }},
+  {{ end -}}
+  [499] = SCMP_ACT_UNDEFINED
+};
 
 SEC("raw_tracepoint/sys_enter")
 int tracepoint__sys_enter(struct bpf_raw_tracepoint_args *ctx) {
