@@ -49,6 +49,54 @@ struct {
   __type(value, uint);
 } actions SEC(".maps");
 
+#define FOR_EACH_CAPABILITY(F)  \
+	F(CAP_CHOWN)            \
+	F(CAP_DAC_OVERRIDE)     \
+	F(CAP_DAC_READ_SEARCH)  \
+	F(CAP_FOWNER)           \
+	F(CAP_FSETID)           \
+	F(CAP_KILL)             \
+	F(CAP_SETGID)           \
+	F(CAP_SETUID)           \
+	F(CAP_SETPCAP)          \
+	F(CAP_LINUX_IMMUTABLE)  \
+	F(CAP_NET_BIND_SERVICE) \
+	F(CAP_NET_BROADCAST)    \
+	F(CAP_NET_ADMIN)        \
+	F(CAP_NET_RAW)          \
+	F(CAP_IPC_LOCK)         \
+	F(CAP_IPC_OWNER)        \
+	F(CAP_SYS_MODULE)       \
+	F(CAP_SYS_RAWIO)        \
+	F(CAP_SYS_CHROOT)       \
+	F(CAP_SYS_PTRACE)       \
+	F(CAP_SYS_PACCT)        \
+	F(CAP_SYS_ADMIN)        \
+	F(CAP_SYS_BOOT)         \
+	F(CAP_SYS_NICE)         \
+	F(CAP_SYS_RESOURCE)     \
+	F(CAP_SYS_TIME)         \
+	F(CAP_SYS_TTY_CONFIG)   \
+	F(CAP_MKNOD)            \
+	F(CAP_LEASE)            \
+	F(CAP_AUDIT_WRITE)      \
+	F(CAP_AUDIT_CONTROL)    \
+	F(CAP_SETFCAP)          \
+	F(CAP_MAC_OVERRIDE)     \
+	F(CAP_MAC_ADMIN)        \
+	F(CAP_SYSLOG)           \
+	F(CAP_WAKE_ALARM)       \
+	F(CAP_BLOCK_SUSPEND)    \
+	F(CAP_AUDIT_READ)       \
+	F(CAP_PERFMON)          \
+	F(CAP_BPF)              \
+	F(CAP_CHECKPOINT_RESTORE)
+
+enum capability {
+#define LIST_CAPABILITY(CAP) CAP,
+	FOR_EACH_CAPABILITY(LIST_CAPABILITY)
+};
+
 /* Since LSM hooks may change with different kernel versions, here we only list the common ones.
  * TODO: Implement best-effort mechanism and add the remaining ones,
  * this requires an upstream support: https://github.com/cilium/ebpf/discussions/1470
@@ -272,6 +320,7 @@ int tracepoint__sys_enter(struct bpf_raw_tracepoint_args *ctx) {
 
   return 0;
 }
+
 {{ range $syscallName, $syscall  := .Syscalls }}
 SEC("tracepoint/syscalls/sys_enter_{{ $syscallName }}")
 int tracepoint__sys_enter_{{ $syscallName }}(struct trace_event_raw_sys_enter *ctx) 
@@ -279,7 +328,16 @@ int tracepoint__sys_enter_{{ $syscallName }}(struct trace_event_raw_sys_enter *c
   u64 mntns_id = gadget_get_mntns_id();
   if (gadget_should_discard_mntns_id(mntns_id))
     return 0;
+  
   u64 pid_tgid = bpf_get_current_pid_tgid();
+  {{ if syscallHasCapsFilters $syscall }}
+  struct task_struct *task;
+  task = (struct task_struct *)bpf_get_current_task();
+  if (!task)
+    return 0;
+  u64 caps;
+  BPF_CORE_READ_INTO(&caps, task, cred, cap_effective);
+  {{ end -}}
   {{ range $idx := $syscall.ArgsIndices }}
   {{- /* The operands for Seccomp conditions are uint64: https://github.com/seccomp/libseccomp-golang/blob/main/seccomp.go#L66 */}}
   u64 arg{{ $idx }} = ctx->args[{{ $idx }}];
@@ -291,17 +349,40 @@ int tracepoint__sys_enter_{{ $syscallName }}(struct trace_event_raw_sys_enter *c
   if (({{ (index $rule.Args 0).Value }} {{ (index $rule.Args 0).Op }} arg{{ (index $rule.Args 0).Index }}) == {{ (index $rule.Args 0).ValueTwo }}) 
   {{ else }}
   if (arg{{ (index $rule.Args 0).Index }} {{ (index $rule.Args 0).Op }} {{ (index $rule.Args 0).Value }}) 
-  {{ end -}}
+  {{- end -}}
   {
   {{ end -}}
+  {{- if or $rule.Excludes.Caps $rule.Includes.Caps -}}
+  if (
+  {{- $lastIndex := sub (len $rule.Excludes.Caps) 1 -}}
+  {{- if $rule.Excludes.Caps -}}
+  {{- range $index, $cap := $rule.Excludes.Caps -}}
+  !(caps & 1ULL << {{ $cap }}) {{ if ne $index $lastIndex }} && {{- end -}}
+  {{- end -}}
+  ) {
+  {{- end }}
+  {{- if or $rule.Includes.Caps -}}
+  {{- $lastIndex := sub (len $rule.Includes.Caps) 1 -}}
+  {{- range $index, $cap := $rule.Includes.Caps -}}
+  (caps & 1ULL << {{ $cap }}) {{ if ne $index $lastIndex }} || {{- end -}}
+  {{- end -}}
+  ) {
+  {{- end -}}
+  {{- end }}
   bpf_map_update_elem(&actions, &pid_tgid, &{{ $rule.Action }}, BPF_NOEXIST);
+  return 0;
+  {{ if or $rule.Excludes.Caps $rule.Includes.Caps -}} } {{ end }}
   {{- if $rule.Args }}
   }
 
   {{- end -}}
   {{- end }}
   
+  {{- if syscallHasFilters $syscall }}
   return 0;
+  {{ end }}
 }
 {{ end }}
+
+
 char LICENSE[] SEC("license") = "GPL";

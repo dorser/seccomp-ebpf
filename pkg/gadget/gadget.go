@@ -188,13 +188,39 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 	return templateProfile, nil
 }
 
+func sub(a, b int) int {
+	return a - b
+}
+
+func syscallHasFilters(syscall Syscall) bool {
+	for _, rule := range syscall.Rules {
+		if len(rule.Includes.Caps) > 0 || len(rule.Excludes.Caps) > 0 || len(rule.Args) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func syscallHasCapsFilters(syscall Syscall) bool {
+	for _, rule := range syscall.Rules {
+		if len(rule.Includes.Caps) > 0 || len(rule.Excludes.Caps) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func generateGadgetTemplate(profileName string, seccompProfile *seccomp.Seccomp) (string, error) {
 	templateProfile, err := seccompToTemplateData(profileName, seccompProfile)
 	if err != nil {
 		return "", err
 	}
 
-	tmpl, err := template.New("gadgetTemplate").Parse(gadgetTemplate)
+	tmpl, err := template.New("gadgetTemplate").Funcs(template.FuncMap{
+		"sub":                   sub,
+		"syscallHasFilters":     syscallHasFilters,
+		"syscallHasCapsFilters": syscallHasCapsFilters,
+	}).Parse(gadgetTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing template: %v", err)
 	}
