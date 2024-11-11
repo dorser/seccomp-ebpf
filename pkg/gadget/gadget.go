@@ -65,15 +65,22 @@ type Syscall struct {
 	ArgsIndices map[uint]uint
 }
 
-type TemplateProfile struct {
+type GadgetCodeTemplateData struct {
 	Name           string
 	DefaultAction  seccomp.Action
 	Syscalls       map[string]Syscall
 	RawTracepoints map[string]seccomp.Action
 }
 
-//go:embed gadget.tmpl
-var gadgetTemplate string
+type MakefileTemplateData struct {
+	Name string
+}
+
+//go:embed program.bpf.c.tmpl
+var gadgetCodeTemplate string
+
+//go:embed Makefile.tmpl
+var makeFileTemplate string
 
 //go:embed include
 var includeFiles embed.FS
@@ -114,10 +121,10 @@ func shouldDiscardSyscallByName(syscallName string) bool {
 	return !exists
 }
 
-func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) (TemplateProfile, error) {
+func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) (GadgetCodeTemplateData, error) {
 	defaultAction := seccompProfile.DefaultAction
 
-	templateProfile := TemplateProfile{
+	templateProfile := GadgetCodeTemplateData{
 		Name:           profileName,
 		DefaultAction:  defaultAction,
 		Syscalls:       make(map[string]Syscall),
@@ -149,7 +156,7 @@ func seccompToTemplateData(profileName string, seccompProfile *seccomp.Seccomp) 
 						for _, seccompArg := range seccompSyscall.Args {
 							op, err := convertSeccompOperator(seccompArg.Op)
 							if err != nil {
-								return TemplateProfile{}, err
+								return GadgetCodeTemplateData{}, err
 							}
 
 							if _, exists := argsIndices[seccompArg.Index]; !exists {
@@ -210,7 +217,7 @@ func syscallHasCapsFilters(syscall Syscall) bool {
 	return false
 }
 
-func generateGadgetTemplate(profileName string, seccompProfile *seccomp.Seccomp) (string, error) {
+func generateGadgetCodeTemplate(profileName string, seccompProfile *seccomp.Seccomp) (string, error) {
 	templateProfile, err := seccompToTemplateData(profileName, seccompProfile)
 	if err != nil {
 		return "", err
@@ -220,7 +227,7 @@ func generateGadgetTemplate(profileName string, seccompProfile *seccomp.Seccomp)
 		"sub":                   sub,
 		"syscallHasFilters":     syscallHasFilters,
 		"syscallHasCapsFilters": syscallHasCapsFilters,
-	}).Parse(gadgetTemplate)
+	}).Parse(gadgetCodeTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing template: %v", err)
 	}
@@ -234,14 +241,35 @@ func generateGadgetTemplate(profileName string, seccompProfile *seccomp.Seccomp)
 	return output.String(), nil
 }
 
+func generateMakefileTemplate(profileName string) (string, error) {
+	tmpl, err := template.New("gadgetManigestTemplate").Parse(makeFileTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing manigest template: %v", err)
+	}
+
+	var output strings.Builder
+	err = tmpl.Execute(&output, MakefileTemplateData{Name: profileName})
+	if err != nil {
+		return "", fmt.Errorf("error executing template: %v", err)
+	}
+
+	return output.String(), nil
+}
+
 func GenerateGadget(profileName string, seccompProfile *seccomp.Seccomp) (map[string]string, error) {
-	gadgetCode, err := generateGadgetTemplate(profileName, seccompProfile)
+	gadgetCode, err := generateGadgetCodeTemplate(profileName, seccompProfile)
 	gadgetFiles := make(map[string]string)
 	if err != nil {
 		return gadgetFiles, err
 	}
 
+	makefile, err := generateMakefileTemplate((profileName))
+	if err != nil {
+		return gadgetFiles, err
+	}
+
 	gadgetFiles["program.bpf.c"] = gadgetCode
+	gadgetFiles["Makefile"] = makefile
 	files, err := includeFiles.ReadDir("include")
 	if err != nil {
 		return gadgetFiles, fmt.Errorf("reading include: %w", err)
