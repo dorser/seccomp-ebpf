@@ -1,0 +1,16 @@
+{
+	"defaultAction": "SCMP_ACT_ALLOW",
+	"syscalls": [
+		{
+			"names": [
+				"open"
+			],
+			"action": "SCMP_ACT_ERRNO",
+			"excludes": {
+				"caps": [
+					"CAP_SYS_ADMIN"
+				]
+			}
+		}
+	]
+}
