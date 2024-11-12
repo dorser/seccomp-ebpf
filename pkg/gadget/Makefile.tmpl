@@ -15,7 +15,7 @@ build:
 # PARAMS="-o jsonpretty" make run
 .PHONY: run
 run:
-	sudo -E ig run $(CONTAINER_REPO):$(IMAGE_TAG) $$PARAMS
+	sudo -E ig run $(CONTAINER_REPO):$(IMAGE_TAG) --verify-image=false $$PARAMS
 
 .PHONY: push
 push:
