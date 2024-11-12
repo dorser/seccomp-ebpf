@@ -116,7 +116,7 @@ func tracepointExists(syscallName string) bool {
 func shouldDiscardSyscallByName(syscallName string) bool {
 	exists := syscalls.SyscallExists(syscallName)
 	if !exists {
-		logrus.Warnf("syscall %s doesn't exist. Ignoring.", syscallName)
+		logrus.Debugf("syscall %s doesn't exist. Ignoring.", syscallName)
 	}
 	return !exists
 }
