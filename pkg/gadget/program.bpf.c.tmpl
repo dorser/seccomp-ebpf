@@ -60,12 +60,29 @@ int tracepoint__sys_enter(struct bpf_raw_tracepoint_args *ctx) {
       return 0;
     event->syscall_raw = ctx->args[1];
     event->action = action;
+    event->mntns_id = mntns_id;
     gadget_submit_buf(ctx, &events, event, sizeof(*event));
   }
 
   return 0;
 }
 
+SEC("raw_tracepoint/sys_exit")
+int tracepoint__sys_exit(struct bpf_raw_tracepoint_args *ctx) {
+  struct event *event;
+  __u64 pid_tgid = bpf_get_current_pid_tgid();
+  uint *map_action;
+  uint action;
+
+  map_action = bpf_map_lookup_elem(&actions, &pid_tgid);
+  if (map_action) {
+    bpf_map_delete_elem(&actions, &pid_tgid);
+  }
+
+  return 0;
+}
+
+  
 {{ range $syscallName, $syscall  := .Syscalls }}
 SEC("tracepoint/syscalls/sys_enter_{{ $syscallName }}")
 int tracepoint__sys_enter_{{ $syscallName }}(struct trace_event_raw_sys_enter *ctx) 
