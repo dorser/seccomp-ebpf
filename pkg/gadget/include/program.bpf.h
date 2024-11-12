@@ -31,6 +31,7 @@ const uint SCMP_ACT_ALLOW = 5;
 const uint SCMP_ACT_ERRNO = 6;
 
 struct event {
+  gadget_mntns_id mntns_id;
   gadget_syscall syscall_raw;
   uint action;
 };
