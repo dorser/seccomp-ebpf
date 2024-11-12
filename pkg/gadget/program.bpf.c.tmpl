@@ -73,10 +73,25 @@ int tracepoint__sys_exit(struct bpf_raw_tracepoint_args *ctx) {
   __u64 pid_tgid = bpf_get_current_pid_tgid();
   uint *map_action;
   uint action;
+  __u64 mntns_id = gadget_get_mntns_id();
 
   map_action = bpf_map_lookup_elem(&actions, &pid_tgid);
   if (map_action) {
-    bpf_map_delete_elem(&actions, &pid_tgid);
+     action = *map_action;
+     bpf_map_delete_elem(&actions, &pid_tgid);
+
+    if (action != SCMP_ACT_ALLOW) {
+      bpf_send_signal(SIGSYS);
+      bpf_send_signal(SIGKILL);
+    }
+
+    event = gadget_reserve_buf(&events, sizeof(*event));
+    if (!event)
+      return 0;
+    event->syscall_raw = ctx->args[1];
+    event->action = action;
+    event->mntns_id = mntns_id;
+    gadget_submit_buf(ctx, &events, event, sizeof(*event));
   }
 
   return 0;
