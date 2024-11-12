@@ -6,7 +6,7 @@ CLANG_FORMAT ?= clang-format
 export IG_EXPERIMENTAL = true
 
 .PHONY: build
-build:
+build: clang-format
 	sudo -E ig image build \
 		-t $(CONTAINER_REPO):$(IMAGE_TAG) \
 		--update-metadata .
